@@ -1,15 +1,15 @@
 import cv2
 import numpy as np
 
-WITH_NMS = False         #是否非极大值抑制
-threshold = 0.01         #设定阈值  
+WITH_NMS = True         #是否非极大值抑制
+threshold = 0.1         #设定阈值  
 
 def getM(img):
     h, w = img.shape[:2]
     Ix = cv2.Sobel(img, cv2.CV_16S, 1, 0, ksize=3)
     Iy = cv2.Sobel(img, cv2.CV_16S, 0, 1, ksize=3)
 
-    #2、计算Ix^2,Iy^2,Ix*Iy 
+    #2、计算Ix^2,Iy^2,Ix*Iy
     m = np.zeros((h,w,3),dtype=np.float32)
     m[:,:,0] = Ix**2
     m[:,:,1] = Iy**2
@@ -20,22 +20,20 @@ def getM(img):
     m[:,:,1] = cv2.GaussianBlur(m[:,:,1],ksize=ksize,sigmaX=2)
     m[:,:,2] = cv2.GaussianBlur(m[:,:,2],ksize=ksize,sigmaX=2)
     m = [np.array([[m[i,j,0],m[i,j,2]],[m[i,j,2],m[i,j,1]]]) for i in range(h) for j in range(w)]
-
     return m
 
-def calcR(M):
+def calcR(M, h, w):
     k = 0.04
-    # print("detM = ", np.linalg.det(M))
-    # print("eig of M:", np.linalg.eig(M))
     #4、计算局部特征结果矩阵M的特征值和响应函数R(i,j)=det(M)-k(trace(M))^2  0.04<=k<=0.06
     D,T = list(map(np.linalg.det,M)),list(map(np.trace,M))
     R = np.array([d-k*t**2 for d,t in zip(D,T)])
 
-    R_max = np.max(R)
-    #print(R_max)
-    #print(np.min(R))
-    h, w = (130, 120)
-    R = R.reshape(h,w)
+    normR = (R / np.linalg.norm(R))*255
+    R_max = np.max(normR)
+    print(R_max)
+    print(np.min(normR))
+    R = normR.reshape(h,w)
+    cv2.imshow("R", R)
     corner = np.zeros_like(R,dtype=np.uint8)
     for i in range(h):
         for j in range(w):
@@ -50,18 +48,42 @@ def calcR(M):
     return corner
 
 def markCorner(img, R):
-    threhold = 10
     print("R shape is:", R.shape)
     h, w = img.shape[0:2]
     print("img shape is :", img.shape)
-    img[R>0.01*R.max()] = [0,0,255]
+    h, w = img.shape[:2]
+    Rmax = R.max()
+    color = (0, 0, 255)
+    for i in range(h):
+        for j in range(w):
+            if R[i][j] > threshold * Rmax:
+                cv2.circle(img, (j, i), 4, color, thickness=-1)
+    # img[R>0.01*R.max()] = [0,0,255]
     return
 
+def lambdaPic(M, h, w):
+    tmp = np.zeros((2,2), dtype=np.float32)
+    lambdaMinMap = np.zeros((h, w), dtype=np.float32)
+    lambdaMaxMap = np.zeros((h, w), dtype=np.float32)
+    for i in range(h):
+        for j in range(w):
+            step = i*w+j
+            tmp = M[step]
+            eigValue, vects = np.linalg.eig(tmp)
+            lambdaMinMap[i][j] = min(eigValue[0], eigValue[1])
+            lambdaMaxMap[i][j] = max(eigValue[0], eigValue[1])
+    normMax = (lambdaMaxMap / np.linalg.norm(lambdaMaxMap))*255
+    normMin = (lambdaMinMap / np.linalg.norm(lambdaMinMap))*255
+    cv2.imshow("lambdaMax", normMax)
+    cv2.imshow("lambdaMin", normMin)
+
 if __name__ == "__main__":
-    img = cv2.imread("chessboard.jpeg")
+    img = cv2.imread("horse.jpg")
+    # paint eigMax and eigMin for gray image
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     M = getM(gray)
-    R = calcR(M)
+    lambdaPic(M, gray.shape[0], gray.shape[1])
+    R = calcR(M, gray.shape[0], gray.shape[1])
     markCorner(img, R)
     cv2.imshow("harris corner", img)
     cv2.waitKey(0)
