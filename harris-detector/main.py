@@ -30,10 +30,7 @@ def calcR(M, h, w):
 
     normR = (R / np.linalg.norm(R))*255
     R_max = np.max(normR)
-    print(R_max)
-    print(np.min(normR))
     R = normR.reshape(h,w)
-    cv2.imshow("R", R)
     corner = np.zeros_like(R,dtype=np.uint8)
     for i in range(h):
         for j in range(w):
@@ -43,14 +40,11 @@ def calcR(M, h, w):
                     corner[i,j] = 255
             else:
                 #只进行阈值检测
-                if R[i,j] > R_max*threshold :
+                if R[i,j] > R_max*threshold:
                     corner[i,j] = 255
     return corner
 
 def markCorner(img, R):
-    print("R shape is:", R.shape)
-    h, w = img.shape[0:2]
-    print("img shape is :", img.shape)
     h, w = img.shape[:2]
     Rmax = R.max()
     color = (0, 0, 255)
@@ -61,7 +55,7 @@ def markCorner(img, R):
     # img[R>0.01*R.max()] = [0,0,255]
     return
 
-def lambdaPic(M, h, w):
+def paintLambda(M, h, w):
     tmp = np.zeros((2,2), dtype=np.float32)
     lambdaMinMap = np.zeros((h, w), dtype=np.float32)
     lambdaMaxMap = np.zeros((h, w), dtype=np.float32)
@@ -78,12 +72,21 @@ def lambdaPic(M, h, w):
     cv2.imshow("lambdaMin", normMin)
 
 if __name__ == "__main__":
-    img = cv2.imread("horse.jpg")
+    img = cv2.imread("horse2.jpg")
+    chs = cv2.split(img)
+    Rs = []
+    for c in chs:
+        M = getM(c)
+        Rs.append(calcR(M, c.shape[0], c.shape[1]))
     # paint eigMax and eigMin for gray image
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     M = getM(gray)
-    lambdaPic(M, gray.shape[0], gray.shape[1])
+    paintLambda(M, gray.shape[0], gray.shape[1])
     R = calcR(M, gray.shape[0], gray.shape[1])
     markCorner(img, R)
     cv2.imshow("harris corner", img)
+
+    # paint three channel img for R
+    merge = cv2.merge(Rs)
+    cv2.imshow("Rs", merge)
     cv2.waitKey(0)
