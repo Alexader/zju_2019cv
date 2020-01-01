@@ -1,0 +1,5 @@
+__pycache__
+!CNN/minst__train/*
+!CNN/minst_test/*
+!CNN/cifar_train/*
+!CNN/cifar_test/*
